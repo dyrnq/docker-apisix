@@ -14,12 +14,12 @@ RUN set -eux && \
     groupadd --system --gid 1001 nginx && \
     adduser --system --gid 1001 --no-create-home --home /nonexistent --comment "nginx user" --shell /bin/false --uid 1001 nginx && \
     cd apisix-build-tools && \
-    sed -i "s@--with-compat@--with-compat --user=nginx --group=nginx@g" build-apisix-openresty.sh && \
-    bash build-apisix-openresty-centos7.sh
+    sed -i "s@--with-compat@--with-compat --user=nginx --group=nginx@g" build-apisix-base.sh && \
+    utils/build-common.sh build_apisix_base_rpm
 
 
 RUN yum install -y pcre which tzdata ca-certificates \
-    && curl -fsSL -o /tmp/apisix.rpm https://github.com/apache/apisix/releases/download/$APISIX_VERSION/apisix-$APISIX_VERSION-0.el7.x86_64.rpm \
+	&& curl -fsSL -o /tmp/apisix.rpm https://github.com/apache/apisix/releases/download/$APISIX_VERSION/apisix-$APISIX_VERSION-0.el7.x86_64.rpm \
 	&& rpm -ivh --nodeps /tmp/apisix.rpm \
 	&& yum clean all \
 	&& sed -i 's/PASS_MAX_DAYS\t99999/PASS_MAX_DAYS\t60/g' /etc/login.defs
