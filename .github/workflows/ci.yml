@@ -36,4 +36,4 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build dockerfile (with push)
         run: |
-          docker buildx build --platform linux/amd64 --output "type=image,push=true" --file ./Dockerfile . --build-arg APISIX_VERSION=2.10.0 --tag dyrnq/apisix:2.10.0
+          docker buildx build --platform linux/amd64 --output "type=image,push=true" --file ./Dockerfile . --build-arg APISIX_VERSION=2.10.1 --tag dyrnq/apisix:2.10.1 --tag dyrnq/apisix:latest
