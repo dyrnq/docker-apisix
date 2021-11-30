@@ -19,10 +19,14 @@ RUN set -eux && \
 
 
 RUN yum install -y pcre which tzdata ca-certificates \
-	&& curl -fsSL -o /tmp/apisix.rpm https://github.com/apache/apisix/releases/download/$APISIX_VERSION/apisix-$APISIX_VERSION-0.el7.x86_64.rpm \
-	&& rpm -ivh --nodeps /tmp/apisix.rpm \
-	&& yum clean all \
-	&& sed -i 's/PASS_MAX_DAYS\t99999/PASS_MAX_DAYS\t60/g' /etc/login.defs
+    && \
+    if [ "$(curl -o /dev/null -s -w '%{http_code}' https://github.com/apache/apisix/releases/download/$APISIX_VERSION/apisix-$APISIX_VERSION-0.el7.x86_64.rpm)" != "404" ]; \
+    then curl -fsSL -o /tmp/apisix.rpm https://github.com/apache/apisix/releases/download/$APISIX_VERSION/apisix-$APISIX_VERSION-0.el7.x86_64.rpm; \
+    else curl -fsSL -o /tmp/apisix.zip https://github.com/apache/apisix/releases/download/$APISIX_VERSION/apisix-$APISIX_VERSION-0.el7.x86_64.rpm.zip && unzip /tmp/apisix.zip -d /tmp && mv /tmp/apisix-*.rpm /tmp/apisix.rpm; \
+    fi \
+    && rpm -ivh --nodeps /tmp/apisix.rpm \
+    && yum clean all \
+    && sed -i 's/PASS_MAX_DAYS\t99999/PASS_MAX_DAYS\t60/g' /etc/login.defs
 
 WORKDIR /usr/local/apisix
 
