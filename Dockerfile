@@ -30,7 +30,8 @@ RUN yum install -y pcre which tzdata ca-certificates && \
     rpm -ivh --nodeps /tmp/apisix-$APISIX_VERSION-*.rpm && \
     yum clean all && \
     rm -rf /tmp/*.rpm && \
-    sed -i 's/PASS_MAX_DAYS\t99999/PASS_MAX_DAYS\t60/g' /etc/login.defs
+    sed -i 's/PASS_MAX_DAYS\t99999/PASS_MAX_DAYS\t60/g' /etc/login.defs && \
+    curl -fsL -o /usr/bin/apisix https://raw.githubusercontent.com/apache/apisix/250db3b28fc6e43e6d97f8512ca5c4d3ca83eead/bin/apisix
 
 WORKDIR /usr/local/apisix
 
