@@ -1,0 +1,147 @@
+FROM alpine:3.16 as build
+
+ARG APISIX_VERSION=2.10.5
+LABEL apisix_version="${APISIX_VERSION}"
+ENV APISIX_VERSION="${APISIX_VERSION}"
+
+
+## https://github.com/api7/apisix-build-tools/blob/master/dockerfiles/Dockerfile.apisix-base.apk
+## https://github.com/apache/apisix-docker/blob/master/alpine/Dockerfile
+
+
+ENV PATH=$PATH:/usr/local/openresty/luajit/bin:/usr/local/openresty/nginx/sbin:/usr/local/openresty/bin
+
+RUN \
+        apk add --no-cache \
+        build-base \
+        coreutils \
+        curl \
+        gd \
+        gd-dev \
+        geoip \
+        geoip-dev \
+        libxslt \
+        libxslt-dev \
+        linux-headers \
+        make \
+        perl-dev \
+        readline-dev \
+        zlib \
+        zlib-dev \
+        unzip \
+        git \
+        sudo \
+        bash \
+        libstdc++ pcre-dev pcre shadow
+
+# install latest Rust to build wasmtime
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+
+RUN \
+    git clone --depth 1 https://github.com/api7/apisix-build-tools && \
+    addgroup -g 1001 -S nginx && adduser -u 1001 -S -D -G nginx -H -s /bin/fasle nginx && \
+    cd apisix-build-tools && \
+    sed \
+    -e "s@--with-compat@--with-compat --user=nginx --group=nginx@g" \
+    -e "/set -x/aversion=\"master\"" \
+    -i.bak \
+    build-apisix-base.sh && \
+    cd /tmp \
+    && curl -fSL -# "https://www.openssl.org/source/openssl-1.1.1g.tar.gz" -o openssl-1.1.1g.tar.gz \
+    && tar xzf openssl-1.1.1g.tar.gz \
+    && cd openssl-1.1.1g \
+    && echo 'patching OpenSSL 1.1.1 for OpenResty' \
+    && curl -s https://raw.githubusercontent.com/openresty/openresty/master/patches/openssl-1.1.1f-sess_set_get_cb_yield.patch | patch -p1 \
+    && ./config \
+      no-threads shared zlib -g \
+      enable-ssl3 enable-ssl3-method \
+      --prefix=/usr/local/openresty/openssl111 \
+      --libdir=lib \
+      -Wl,-rpath,/usr/local/openresty/openssl111/lib \
+    && make \
+    && make install_sw \
+    && cd /tmp \
+    && curl -fSL -# https://downloads.sourceforge.net/project/pcre/pcre/8.44/pcre-8.44.tar.gz -o pcre-8.44.tar.gz \
+    && tar xzf pcre-8.44.tar.gz \
+    && cd /tmp/pcre-8.44 \
+    && ./configure \
+        --prefix=/usr/local/openresty/pcre \
+        --disable-cpp \
+        --enable-jit \
+        --enable-utf \
+        --enable-unicode-properties \
+    && make \
+    && make install && source /root/.cargo/env && \
+    export openssl_prefix=/usr/local/openresty/openssl111 && \
+    export zlib_prefix=/usr/local/openresty/zlib && \
+    export pcre_prefix=/usr/local/openresty/pcre && \
+    export OR_PREFIX=/usr/local/openresty && \
+    export cc_opt="-DNGX_LUA_ABORT_AT_PANIC -I${zlib_prefix}/include -I${pcre_prefix}/include -I${openssl_prefix}/include" && \
+    export ld_opt="-L${zlib_prefix}/lib -L${pcre_prefix}/lib -L${openssl_prefix}/lib -Wl,-rpath,${zlib_prefix}/lib:${pcre_prefix}/lib:${openssl_prefix}/lib" && \
+    cd /apisix-build-tools && ./build-apisix-base.sh && \
+    rm /usr/local/openresty/wasmtime-c-api/lib/libwasmtime.a && \
+    rm /usr/local/openresty/wasmtime-c-api/lib/libwasmtime.d && \
+    /usr/local/openresty/bin/openresty -v && /usr/local/openresty/bin/openresty -V
+
+
+FROM alpine:3.16
+
+ARG APISIX_VERSION=2.10.5
+LABEL apisix_version="${APISIX_VERSION}"
+ENV APISIX_VERSION="${APISIX_VERSION}"
+
+COPY --from=build /usr/local/openresty /usr/local/openresty
+
+RUN \
+        set -x && \
+        apk add --no-cache \
+        gd \
+        geoip \
+        libxslt \
+        zlib \
+        libstdc++ \
+        && apk add --no-cache --virtual .build-deps \
+        curl \
+        make \
+        sudo && \
+        curl https://raw.githubusercontent.com/apache/apisix/master/utils/linux-install-luarocks.sh -sL | sh - \
+        && apk del .build-deps \
+        && apk add --no-cache --virtual .builddeps \
+        build-base \
+        automake \
+        autoconf \
+        make \
+        libtool \
+        pkgconfig \
+        cmake \
+        unzip \
+        curl \
+        openssl \
+        git \
+        openldap-dev pcre-dev bash && \
+        curl -fsSL -O https://github.com/apache/apisix/raw/master/rockspec/apisix-${APISIX_VERSION}-0.rockspec && \
+        PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/openresty/luajit/bin:/usr/local/openresty/nginx/sbin:/usr/local/openresty/bin" luarocks install apisix-${APISIX_VERSION}-0.rockspec --tree=/usr/local/apisix/deps && \
+        cp -v /usr/local/apisix/deps/lib/luarocks/rocks-5.1/apisix/${APISIX_VERSION}-0/bin/apisix /usr/bin/ && \
+        mv /usr/local/apisix/deps/share/lua/5.1/apisix /usr/local/apisix && \
+        curl -fsL -o /usr/bin/apisix https://raw.githubusercontent.com/apache/apisix/250db3b28fc6e43e6d97f8512ca5c4d3ca83eead/bin/apisix \
+        && apk del .builddeps \
+        && apk add --no-cache \
+        bash \
+        curl \
+        libstdc++ \
+        openldap \
+        tzdata shadow pcre \
+        && ln -sf /dev/stdout /usr/local/apisix/logs/access.log \
+        && ln -sf /dev/stderr /usr/local/apisix/logs/error.log \
+        && addgroup -g 1001 -S nginx && adduser -u 1001 -S -D -G nginx -H -s /bin/fasle nginx
+
+WORKDIR /usr/local/apisix
+
+ENV PATH=$PATH:/usr/local/openresty/luajit/bin:/usr/local/openresty/nginx/sbin:/usr/local/openresty/bin
+
+EXPOSE 9080 9443
+
+CMD ["sh", "-c", "/usr/bin/apisix init && /usr/bin/apisix init_etcd && /usr/local/openresty/bin/openresty -p /usr/local/apisix -g 'daemon off;'"]
+
+STOPSIGNAL SIGQUIT
