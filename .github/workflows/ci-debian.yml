@@ -22,7 +22,7 @@ jobs:
         # - "docker buildx build --platform linux/amd64,linux/arm64 --output \"type=image,push=true\" --file ./Dockerfile.debian . --build-arg APISIX_VERSION=2.10.4 --tag dyrnq/apisix:2.10.4-debian"
         # - "docker buildx build --platform linux/amd64,linux/arm64 --output \"type=image,push=true\" --file ./Dockerfile.debian . --build-arg APISIX_VERSION=2.10.5 --tag dyrnq/apisix:2.10.5-debian"
         # - "docker buildx build --platform linux/amd64,linux/arm64 --output \"type=image,push=true\" --file ./Dockerfile.debian . --build-arg APISIX_VERSION=2.14.1 --tag dyrnq/apisix:2.14.1-debian"
-        - "docker buildx build --platform linux/amd64,linux/arm64 --output \"type=image,push=true\" --file ./Dockerfile.debian . --build-arg APISIX_VERSION=2.15.0 --tag dyrnq/apisix:2.15.0-debian"
+        - "docker buildx build --platform linux/amd64,linux/arm64 --output \"type=image,push=true\" --file ./Dockerfile.debian . --build-arg APISIX_VERSION=2.13.3 --tag dyrnq/apisix:2.13.3-debian"
 
 
 
